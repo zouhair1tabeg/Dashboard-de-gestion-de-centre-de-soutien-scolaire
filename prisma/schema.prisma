@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum SubjectType {
+  SCHOOL
+  LANGUAGE
+}
+
+enum SessionStatus {
+  PLANNED
+  DONE
+  POSTPONED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+// ---------------------------------------------------------------------------
+// Academic structure
+// ---------------------------------------------------------------------------
+
+model Subject {
+  id       String      @id @default(cuid())
+  name     String      @unique
+  type     SubjectType
+  levels   Level[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("subjects")
+}
+
+model Level {
+  id        String    @id @default(cuid())
+  name      String
+  subjectId String
+  subject   Subject   @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  groups    Group[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([subjectId, name])
+  @@index([subjectId])
+  @@map("levels")
+}
+
+model Group {
+  id          String       @id @default(cuid())
+  name        String
+  levelId     String
+  level       Level        @relation(fields: [levelId], references: [id], onDelete: Restrict)
+  monthlyFee  Decimal      @db.Decimal(10, 2)
+  capacity    Int
+  isActive    Boolean      @default(true)
+  schedules   Schedule[]
+  sessions    Session[]
+  enrollments Enrollment[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([levelId, name])
+  @@index([levelId])
+  @@map("groups")
+}
+
+model Schedule {
+  id        String @id @default(cuid())
+  groupId   String
+  group     Group  @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  // 0 = dimanche, 1 = lundi, ... 6 = samedi
+  dayOfWeek Int
+  // Heures au format "HH:mm"
+  startTime String @db.VarChar(5)
+  endTime   String @db.VarChar(5)
+
+  @@index([groupId])
+  @@map("schedules")
+}
+
+// ---------------------------------------------------------------------------
+// Students & enrollments
+// ---------------------------------------------------------------------------
+
+model Student {
+  id          String       @id @default(cuid())
+  fullName    String
+  phone       String
+  parentName  String?
+  parentPhone String?
+  registeredAt DateTime    @default(now())
+  isActive    Boolean      @default(true)
+  enrollments Enrollment[]
+  attendances Attendance[]
+
+  @@index([fullName])
+  @@index([isActive])
+  @@map("students")
+}
+
+model Enrollment {
+  id        String    @id @default(cuid())
+  studentId String
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  groupId   String
+  group     Group     @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  startDate DateTime  @db.Date
+  endDate   DateTime? @db.Date
+  // Remise mensuelle accordée sur le tarif du groupe
+  discount  Decimal   @default(0) @db.Decimal(10, 2)
+  isActive  Boolean   @default(true)
+  payments  Payment[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([studentId])
+  @@index([groupId])
+  @@index([studentId, isActive])
+  @@map("enrollments")
+}
+
+// ---------------------------------------------------------------------------
+// Sessions & attendance
+// ---------------------------------------------------------------------------
+
+model Session {
+  id              String         @id @default(cuid())
+  groupId         String
+  group           Group          @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  date            DateTime       @db.Date
+  // Heures au format "HH:mm"
+  startTime       String         @db.VarChar(5)
+  endTime         String         @db.VarChar(5)
+  status          SessionStatus  @default(PLANNED)
+  // Renseigné pour une séance REPORTÉE (POSTPONED)
+  replacementDate DateTime?      @db.Date
+  note            String?
+  attendances     Attendance[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([groupId])
+  @@index([date])
+  @@index([groupId, date])
+  @@map("sessions")
+}
+
+model Attendance {
+  id        String           @id @default(cuid())
+  sessionId String
+  session   Session          @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  studentId String
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  status    AttendanceStatus
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([sessionId, studentId])
+  @@index([sessionId])
+  @@index([studentId])
+  @@map("attendances")
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id           String        @id @default(cuid())
+  enrollmentId String
+  enrollment   Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  // Mois concerné au format "YYYY-MM"
+  month        String        @db.VarChar(7)
+  amountDue    Decimal       @db.Decimal(10, 2)
+  amountPaid   Decimal       @default(0) @db.Decimal(10, 2)
+  status       PaymentStatus @default(UNPAID)
+  paidAt       DateTime?
+  note         String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([enrollmentId, month])
+  @@index([enrollmentId])
+  @@index([month])
+  @@index([status])
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
