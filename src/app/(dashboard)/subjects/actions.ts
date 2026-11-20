@@ -220,6 +220,18 @@ export async function updateGroup(
   if (!parsed.success) return validationError(parsed.error);
 
   const { id, ...data } = parsed.data;
+  const capacity = Number(data.capacity);
+
+  // On ne peut pas réduire la capacité sous le nombre d'élèves déjà inscrits.
+  const activeEnrollments = await prisma.enrollment.count({
+    where: { groupId: id, isActive: true },
+  });
+
+  if (capacity < activeEnrollments) {
+    return actionError(
+      `Ce groupe compte ${activeEnrollments} élève${activeEnrollments > 1 ? "s" : ""} inscrit${activeEnrollments > 1 ? "s" : ""}. La capacité ne peut pas être inférieure.`,
+    );
+  }
 
   try {
     await prisma.group.update({
@@ -228,7 +240,7 @@ export async function updateGroup(
         levelId: data.levelId,
         name: data.name,
         monthlyFee: normalizeMoney(data.monthlyFee),
-        capacity: Number(data.capacity),
+        capacity,
         isActive: data.isActive,
       },
     });
