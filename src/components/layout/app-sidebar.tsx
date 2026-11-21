@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Settings,
   Users,
   Wallet,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const navigation = [
   { href: "/subjects", label: "Matières & Groupes", icon: BookOpen },
   { href: "/sessions", label: "Séances", icon: CalendarDays },
   { href: "/payments", label: "Paiements", icon: Wallet },
+  { href: "/settings", label: "Paramètres", icon: Settings },
 ] as const;
 
 function Brand() {

@@ -1,72 +1,136 @@
-# Centre Prime — Gestion du centre de soutien scolaire
+# Déploiement du Centre de Soutien Scolaire (Prime) sur VPS
 
-Application de gestion pour un centre de soutien scolaire : élèves, matières et groupes,
-planning des séances, présences et paiements mensuels en espèces.
+Ce guide détaille les étapes pour déployer l'application sur un serveur VPS (Ubuntu / Debian) en production avec **Docker Compose**, **PostgreSQL** et **Nginx** (avec HTTPS via Certbot).
 
-Interface en français. Une seule administratrice ou un seul administrateur (Auth.js, identifiants).
+---
 
-## Stack
+## 1. Prérequis sur le VPS
 
-- Next.js 16 (App Router) + TypeScript strict
-- PostgreSQL + Prisma 7
-- Tailwind CSS 4 + shadcn/ui
-- Auth.js v5 (Credentials)
-- Zod + React Hook Form
-- TanStack Table, Recharts
+- Un serveur VPS (ex: DigitalOcean, Hetzner, AWS) avec Ubuntu 22.04+
+- Docker et Docker Compose installés
+- Un nom de domaine pointant vers l'IP de votre VPS (ex: `gestion.centre-prime.ma`)
 
-## Démarrage
+---
 
-### 1. Prérequis
+## 2. Configuration du projet sur le serveur
 
-- Node.js 20+
-- Une base PostgreSQL accessible
+1. Clonez ou transférez le projet dans `/opt/prime` :
+   ```bash
+   git clone https://github.com/votre-compte/prime.git /opt/prime
+   cd /opt/prime
+   ```
 
-### 2. Variables d'environnement
+2. Créez un fichier `.env` de production basé sur `.env.example` :
+   ```env
+   NODE_ENV=production
+   PORT=3000
+   DATABASE_URL="postgresql://prime_user:SECURE_PASSWORD@postgres:5432/prime_db?schema=public"
+   AUTH_SECRET="générez_une_clé_secrète_très_forte_ici"
+   AUTH_URL="https://gestion.centre-prime.ma"
+   ```
 
-Copier `.env.example` vers `.env`, puis renseigner :
+---
 
-```bash
-cp .env.example .env
+## 3. Fichier Docker Compose (`docker-compose.yml`)
+
+Créez un fichier `docker-compose.yml` à la racine :
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: prime_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: prime_user
+      POSTGRES_PASSWORD: SECURE_PASSWORD
+      POSTGRES_DB: prime_db
+    volumes:
+      :/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  app:
+    build: .
+    container_name: prime_app
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://prime_user:SECURE_PASSWORD@postgres:5432/prime_db?schema=public
+      - AUTH_SECRET=générez_une_clé_secrète_très_forte_ici
+      - AUTH_URL=https://gestion.centre-prime.ma
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
 ```
 
-| Variable         | Description                                              |
-| ---------------- | -------------------------------------------------------- |
-| `DATABASE_URL`   | Chaîne de connexion PostgreSQL                            |
-| `AUTH_SECRET`    | Secret Auth.js (`openssl rand -base64 32`)                |
-| `ADMIN_EMAIL`    | E-mail du compte administrateur créé par le seed          |
-| `ADMIN_PASSWORD` | Mot de passe du compte administrateur créé par le seed    |
+---
 
-### 3. Base de données
+## 4. Lancement de l'application
 
-```bash
-npm install
-npx prisma migrate dev   # applique les migrations
-npx prisma db seed       # données de démonstration + compte admin
-```
+1. Lancez les conteneurs en arrière-plan :
+   ```bash
+   docker compose up -d --build
+   ```
 
-### 4. Lancer l'application
+2. Exécutez les migrations Prisma et le seed (si nécessaire) :
+   ```bash
+   docker exec -it prime_app npx prisma migrate deploy
+   docker exec -it prime_app npx prisma db seed
+   ```
 
-```bash
-npm run dev
-```
+---
 
-Ouvrir [http://localhost:3000](http://localhost:3000), puis se connecter avec
-`ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+## 5. Configuration de Nginx & SSL (Let's Encrypt)
 
-## Scripts
+1. Installez Nginx et Certbot :
+   ```bash
+   sudo apt update
+   sudo apt install nginx certbot python3-certbot-nginx -y
+   ```
 
-| Commande             | Description                              |
-| -------------------- | ---------------------------------------- |
-| `npm run dev`        | Serveur de développement                 |
-| `npm run build`      | Build de production (génère le client Prisma) |
-| `npm run start`      | Serveur de production                    |
-| `npm run lint`       | ESLint                                   |
-| `npm run typecheck`  | Vérification TypeScript                  |
-| `npm run db:migrate` | Crée/applique une migration              |
-| `npm run db:seed`    | Réinitialise les données de démonstration |
-| `npm run db:studio`  | Prisma Studio                            |
+2. Créez un fichier de configuration Nginx `/etc/nginx/sites-available/prime` :
+   ```nginx
+   server {
+       server_name gestion.centre-prime.ma;
 
-## Base de données de démonstration
+       location / {
+           proxy_pass http://127.0.0.1:3000;
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection 'upgrade';
+           proxy_set_header Host $host;
+           proxy_cache_bypass $http_upgrade;
+       }
+   }
+   ```
 
-Le seed fournit 4 matières, 8 niveaux, 8 groupes, 30 élèves et 47 inscriptions,
-ainsi que le compte administrateur défini dans `.env`.
+3. Activez le site :
+   ```bash
+   sudo ln -s /etc/nginx/sites-available/prime /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl restart nginx
+   ```
+
+4. Obtenez un certificat SSL gratuit :
+   ```bash
+   sudo certbot --nginx -d gestion.centre-prime.ma
+   ```
+
+---
+
+## 6. Sauvegarde automatique (Backup)
+
+Pour automatiser la sauvegarde de la base de données PostgreSQL chaque nuit :
+
+1. Rendez le script de backup exécutable :
+   ```bash
+   chmod +x scripts/backup_db.sh
+   ```
+
+2. Ajoutez une tâche cron (`crontab -e`) :
+   ```cron
+   0 3 * * * /opt/prime/scripts/backup_db.sh >> /var/log/prime_backup.log 2>&1
+   ```

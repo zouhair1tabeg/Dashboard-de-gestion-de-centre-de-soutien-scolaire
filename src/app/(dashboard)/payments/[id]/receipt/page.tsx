@@ -46,6 +46,9 @@ export default async function ReceiptPage({
     year: "numeric",
   }).format(new Date(`${payment.month}-02`));
 
+  const amountDue = Number(payment.amountDue);
+  const amountPaid = Number(payment.amountPaid);
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <div className="flex items-center justify-between print:hidden">
@@ -88,15 +91,15 @@ export default async function ReceiptPage({
             </div>
             <div className="mt-2 flex justify-between">
               <span>Montant Dû :</span>
-              <span>{Number(payment.amountDue)} DH</span>
+              <span>{amountDue} DH</span>
             </div>
             <div className="mt-1 flex justify-between font-bold text-green-700">
               <span>Montant Réglé :</span>
-              <span>{Number(payment.amountPaid)} DH</span>
+              <span>{amountPaid} DH</span>
             </div>
             <div className="mt-1 flex justify-between text-destructive">
               <span>Reste à Payer :</span>
-              <span>{Number(payment.amountDue) - Number(payment.amountPaid)} DH</span>
+              <span>{amountDue - amountPaid} DH</span>
             </div>
           </div>
 

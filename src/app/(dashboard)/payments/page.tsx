@@ -3,6 +3,7 @@
 import {
   CalendarDays,
   CheckCheck,
+  Download,
   Filter,
   Loader2,
   Plus,
@@ -53,7 +54,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate } from "@/lib/format";
+import { ExportExcelButton } from "@/components/ui/export-excel";
 
 type PaymentView = {
   id: string;
@@ -173,33 +174,48 @@ export default function PaymentsPage() {
       />
 
       <Card>
-        <CardContent className="flex flex-wrap gap-4 pt-6">
-          <div className="flex items-center gap-2">
-            <Label>Mois</Label>
-            <Input
-              type="month"
-              value={monthParam}
-              className="w-40"
-              onChange={(e) => updateFilters("month", e.target.value)}
-            />
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label>Mois</Label>
+              <Input
+                type="month"
+                value={monthParam}
+                className="w-40"
+                onChange={(e) => updateFilters("month", e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label>Statut</Label>
+              <Select
+                value={statusParam}
+                onValueChange={(val) => updateFilters("status", val)}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tous</SelectItem>
+                  <SelectItem value="UNPAID">Impayés</SelectItem>
+                  <SelectItem value="PARTIAL">Partiels</SelectItem>
+                  <SelectItem value="PAID">Payés</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Label>Statut</Label>
-            <Select
-              value={statusParam}
-              onValueChange={(val) => updateFilters("status", val)}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tous</SelectItem>
-                <SelectItem value="UNPAID">Impayés</SelectItem>
-                <SelectItem value="PARTIAL">Partiels</SelectItem>
-                <SelectItem value="PAID">Payés</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <ExportExcelButton
+            data={payments.map((p) => ({
+              Eleve: p.studentName,
+              Groupe: p.groupName,
+              Mois: p.month,
+              MontantDu: p.amountDue,
+              MontantRegle: p.amountPaid,
+              Statut: p.status === "PAID" ? "Payé" : p.status === "PARTIAL" ? "Partiel" : "Impayé",
+              Note: p.note || "",
+            }))}
+            filename="paiements_centre_prime"
+            label="Exporter les paiements"
+          />
         </CardContent>
       </Card>
 

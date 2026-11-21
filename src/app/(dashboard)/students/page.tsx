@@ -1,7 +1,8 @@
-import { Plus, Users } from "lucide-react";
+import { Plus, Users, Download } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 
+import { ExportExcelButton } from "@/components/ui/export-excel";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -132,14 +133,26 @@ export default async function StudentsPage({
         title="Élèves"
         description="Fiches, coordonnées et inscriptions aux groupes."
         actions={
-          <StudentFormDialog
-            trigger={
-              <Button>
-                <Plus className="size-4" />
-                Nouvel élève
-              </Button>
-            }
-          />
+          <div className="flex gap-2">
+            <ExportExcelButton
+              data={rows.map((r) => ({
+                Nom: r.fullName,
+                Telephone: r.phone,
+                Statut: r.isActive ? "Actif" : "Inactif",
+                Groupes: r.groupLabels.join(", "),
+              }))}
+              filename="eleves_centre_prime"
+              label="Exporter"
+            />
+            <StudentFormDialog
+              trigger={
+                <Button>
+                  <Plus className="size-4" />
+                  Nouvel élève
+                </Button>
+              }
+            />
+          </div>
         }
       />
 
