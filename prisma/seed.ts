@@ -273,11 +273,102 @@ async function main() {
     prisma.enrollment.count(),
   ]);
 
+  // Seed des paiements de démonstration (septembre, octobre, novembre 2026)
+  const allEnrollments = [...primaryEnrollments, ...secondaryEnrollments];
+  const months = ["2026-09", "2026-10", "2026-11"];
+  const groupFeeMap = new Map<string, number>();
+  for (const group of groups) {
+    groupFeeMap.set(group.id, Number(group.monthlyFee));
+  }
+
+  const paymentsToCreate: {
+    enrollmentId: string;
+    month: string;
+    amountDue: number;
+    amountPaid: number;
+    status: "PAID" | "PARTIAL" | "UNPAID";
+    paidAt: Date | null;
+    note?: string;
+  }[] = [];
+
+  allEnrollments.forEach((enr, idx) => {
+    const fee = groupFeeMap.get(enr.groupId) ?? 300;
+    const discount = Number(enr.discount);
+    const amountDue = Math.max(0, fee - discount);
+
+    months.forEach((month, mIdx) => {
+      const seedVal = (idx + mIdx * 7) % 10;
+      let status: "PAID" | "PARTIAL" | "UNPAID";
+      let amountPaid = 0;
+      let paidAt: Date | null = null;
+      let note: string | undefined = `Cotisation mensuelle ${month}`;
+
+      if (month === "2026-09") {
+        if (seedVal < 7) {
+          status = "PAID";
+          amountPaid = amountDue;
+          paidAt = new Date("2026-09-05T10:00:00Z");
+        } else if (seedVal < 9) {
+          status = "PARTIAL";
+          amountPaid = Math.round(amountDue / 2);
+          paidAt = new Date("2026-09-12T14:30:00Z");
+          note = "Acompte versé le 12/09";
+        } else {
+          status = "UNPAID";
+          amountPaid = 0;
+          paidAt = null;
+        }
+      } else if (month === "2026-10") {
+        if (seedVal < 5) {
+          status = "PAID";
+          amountPaid = amountDue;
+          paidAt = new Date("2026-10-04T11:00:00Z");
+        } else if (seedVal < 7) {
+          status = "PARTIAL";
+          amountPaid = Math.round(amountDue / 2);
+          paidAt = new Date("2026-10-10T16:00:00Z");
+        } else {
+          status = "UNPAID";
+          amountPaid = 0;
+          paidAt = null;
+        }
+      } else {
+        if (seedVal < 3) {
+          status = "PAID";
+          amountPaid = amountDue;
+          paidAt = new Date("2026-11-02T09:15:00Z");
+        } else if (seedVal < 5) {
+          status = "PARTIAL";
+          amountPaid = Math.round(amountDue / 2);
+          paidAt = new Date("2026-11-08T15:00:00Z");
+        } else {
+          status = "UNPAID";
+          amountPaid = 0;
+          paidAt = null;
+        }
+      }
+
+      paymentsToCreate.push({
+        enrollmentId: enr.id,
+        month,
+        amountDue,
+        amountPaid,
+        status,
+        paidAt,
+        note,
+      });
+    });
+  });
+
+  await prisma.payment.createMany({ data: paymentsToCreate });
+  const paymentCount = await prisma.payment.count();
+
   console.log("Seed terminé :");
   console.log(`  Matières      : ${subjectCount}`);
   console.log(`  Groupes       : ${groupCount}`);
   console.log(`  Élèves        : ${studentCount}`);
   console.log(`  Inscriptions  : ${enrollmentCount}`);
+  console.log(`  Paiements     : ${paymentCount}`);
   console.log(`  Admin         : ${adminEmail}`);
 }
 
