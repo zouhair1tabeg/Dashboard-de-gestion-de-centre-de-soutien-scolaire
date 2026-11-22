@@ -43,7 +43,7 @@ export function DashboardCharts({ revenueData, fillRates }: DashboardChartsProps
                 <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis fontSize={12} tickLine={false} axisLine={false} unit=" DH" />
                 <Tooltip
-                  formatter={(value: any) => [`${Number(value).toFixed(2)} DH`, "Encaissé"]}
+                  formatter={(value) => [`${Number(value).toFixed(2)} DH`, "Encaissé"]}
                   contentStyle={{ backgroundColor: "var(--background)", borderColor: "var(--border)", borderRadius: "8px" }}
                 />
                 <Area type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
@@ -57,7 +57,7 @@ export function DashboardCharts({ revenueData, fillRates }: DashboardChartsProps
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold">Taux de remplissage par groupe</CardTitle>
-          <CardDescription>Pourcentage d'occupation par rapport à la capacité</CardDescription>
+          <CardDescription>Pourcentage d&apos;occupation par rapport à la capacité</CardDescription>
         </CardHeader>
         <CardContent className="px-2 pb-4">
           <div className="h-[280px] w-full">
@@ -67,7 +67,7 @@ export function DashboardCharts({ revenueData, fillRates }: DashboardChartsProps
                 <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} interval={0} angle={-25} textAnchor="end" height={50} />
                 <YAxis fontSize={12} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} />
                 <Tooltip
-                  formatter={(value: any) => [`${value}%`, "Remplissage"]}
+                  formatter={(value) => [`${value}%`, "Remplissage"]}
                   contentStyle={{ backgroundColor: "var(--background)", borderColor: "var(--border)", borderRadius: "8px" }}
                 />
                 <Bar dataKey="percentage" fill="#6366f1" radius={[4, 4, 0, 0]} />

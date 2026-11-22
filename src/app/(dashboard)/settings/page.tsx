@@ -45,7 +45,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <CardTitle className="text-base font-semibold">Sécurité du compte</CardTitle>
-              <CardDescription>Modifier le mot de passe de l'administrateur</CardDescription>
+              <CardDescription>Modifier le mot de passe de l&apos;administrateur</CardDescription>
             </div>
           </div>
         </CardHeader>

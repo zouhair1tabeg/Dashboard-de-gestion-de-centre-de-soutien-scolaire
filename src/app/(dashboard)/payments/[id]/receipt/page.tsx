@@ -115,7 +115,7 @@ export default async function ReceiptPage({
               <p>Cachet et Signature du Centre</p>
             </div>
             <div>
-              <p>Signature de l'élève / parent</p>
+              <p>Signature de l&apos;élève / parent</p>
             </div>
           </div>
         </CardContent>

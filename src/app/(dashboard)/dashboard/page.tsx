@@ -1,6 +1,5 @@
 import { connection } from "next/server";
-import { ArrowUpRight, BookOpen, CalendarDays, Users, Wallet, AlertCircle, CheckCircle, TrendingUp } from "lucide-react";
-import Link from "next/link";
+import { CalendarDays, Users, Wallet, AlertCircle } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
@@ -74,7 +73,6 @@ export default async function DashboardPage() {
 
   // 3. Séances du jour
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 = Dimanche, 1 = Lundi, etc.
 
   const todaySessionsCount = await prisma.session.count({
     where: {
@@ -202,7 +200,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{todaySessionsCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">Séances prévues aujourd'hui</p>
+            <p className="text-xs text-muted-foreground mt-1">Séances prévues aujourd&apos;hui</p>
           </CardContent>
         </Card>
       </div>

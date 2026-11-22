@@ -1,18 +1,12 @@
 "use client";
 
 import {
-  CalendarDays,
-  CheckCheck,
+  ChevronLeft,
+  ChevronRight,
   Download,
-  Filter,
   Loader2,
-  Plus,
   PlusCircle,
   Receipt,
-  Search,
-  Wallet,
-  X,
-  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -30,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -49,44 +42,68 @@ import {
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  TableCell,
 } from "@/components/ui/table";
-import { ExportExcelButton } from "@/components/ui/export-excel";
+import type { SerializedPayment } from "@/lib/serialize";
 
-type PaymentView = {
-  id: string;
-  enrollmentId: string;
-  studentName: string;
-  groupName: string;
-  subjectName: string;
-  levelName: string;
-  month: string;
-  amountDue: number;
-  amountPaid: number;
-  status: "UNPAID" | "PARTIAL" | "PAID";
-  paidAt: Date | null;
-  note: string | null;
-};
+function getCurrentMonthYYYYMM(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function addMonth(monthStr: string, months: number): string {
+  const [year, month] = monthStr.split("-").map(Number);
+  const date = new Date(year, month - 1 + months, 1);
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  return `${date.getFullYear()}-${m}`;
+}
+
+function subtractMonth(monthStr: string): string {
+  return addMonth(monthStr, -1);
+}
 
 export default function PaymentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [loading, setLoading] = useState(true);
-  const [payments, setPayments] = useState<PaymentView[]>([]);
+  const [payments, setPayments] = useState<SerializedPayment[]>([]);
   const [genOpen, setGenOpen] = useState(false);
   const [genMonth, setGenMonth] = useState("");
   const [payOpen, setPayOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentView | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<SerializedPayment | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [payNote, setPayNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const monthParam = searchParams.get("month") || "";
+  // --- Gestion du mois ---
+  const defaultMonth = getCurrentMonthYYYYMM();
+  let initialMonth = defaultMonth;
+  const urlMonth = searchParams.get("month");
+  // Autorise mois courant + 1 maximum
+  const maxAllowedMonth = addMonth(defaultMonth, 1);
+  if (urlMonth) {
+    if (urlMonth > maxAllowedMonth) {
+      initialMonth = maxAllowedMonth;
+    } else {
+      initialMonth = urlMonth;
+    }
+  } else {
+    initialMonth = defaultMonth;
+  }
+
+  const [monthParam, setMonthParam] = useState(initialMonth);
   const statusParam = searchParams.get("status") || "ALL";
+
+  // --- Calcul des totaux ---
+  const totalPaid = payments.reduce((sum, p) => sum + Number(p.amountPaid || 0), 0);
+  const totalRemaining = payments.reduce(
+    (sum, p) => sum + Number(p.amountDue || 0) - Number(p.amountPaid || 0),
+    0,
+  );
 
   const fetchPayments = useCallback(async () => {
     setLoading(true);
@@ -96,32 +113,43 @@ export default function PaymentsPage() {
     });
 
     if (res.ok && res.payments) {
-      setPayments(
-        res.payments.map((p: any) => ({
-          id: p.id,
-          enrollmentId: p.enrollmentId,
-          studentName: p.studentFullName,
-          groupName: p.groupName,
-          subjectName: p.subjectName,
-          levelName: p.levelName,
-          month: p.month,
-          amountDue: Number(p.amountDue),
-          amountPaid: Number(p.amountPaid),
-          status: p.status,
-          paidAt: p.paidAt,
-          note: p.note,
-        })),
-      );
+      setPayments(res.payments);
     }
     setLoading(false);
   }, [monthParam, statusParam]);
 
   useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
+    let active = true;
+
+    // Chargement asynchrone : aucun setState synchrone dans l'effet.
+    async function load() {
+      const res = await getPayments({
+        month: monthParam || undefined,
+        status: statusParam === "ALL" ? undefined : statusParam,
+      });
+
+      if (!active) return;
+
+      if (res.ok && res.payments) {
+        setPayments(res.payments);
+      }
+      setLoading(false);
+    }
+
+    void load();
+
+    return () => {
+      active = false;
+    };
+  }, [monthParam, statusParam]);
 
   const handleGenerate = async () => {
     if (!genMonth) return;
+    if (genMonth > maxAllowedMonth) {
+      toast.error("Impossible de générer pour un mois trop éloigné.");
+      setGenOpen(false);
+      return;
+    }
     setSubmitting(true);
     const res = await generateMonthlyPayments(genMonth);
     setSubmitting(false);
@@ -131,6 +159,53 @@ export default function PaymentsPage() {
       fetchPayments();
     } else {
       toast.error(res.error);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (!monthParam) {
+      toast.error("Sélectionnez un mois à exporter d'abord.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const params = new URLSearchParams(searchParams.toString());
+      if (statusParam && statusParam !== "ALL") {
+        params.set("status", statusParam);
+      } else {
+        params.delete("status");
+      }
+      const res = await fetch(
+        `/api/payments/export?month=${monthParam}&${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Accept:
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          },
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error || "Erreur lors de l'export");
+        return;
+      }
+      // Créer un lien de téléchargement
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `paiements-${monthParam}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success("Fichier Excel téléchargé avec succès");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur lors de l'exportation du fichier");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -160,31 +235,83 @@ export default function PaymentsPage() {
     router.push(`/payments?${params.toString()}`);
   };
 
+  // Format "Mois Français" pour l'affichage
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Paiements"
         description="Gestion des cotisations mensuelles par élève."
         actions={
-          <Button onClick={() => setGenOpen(true)}>
-            <PlusCircle className="mr-2 size-4" />
-            Générer le mois
-          </Button>
+          <>
+            <Button onClick={() => setGenOpen(true)} disabled={loading}>
+              <PlusCircle className="mr-2 size-4" />
+              Générer le mois
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportExcel}
+              disabled={loading}
+              className="ml-2"
+            >
+              <Download className="mr-2 size-4" />
+              Exporter
+            </Button>
+          </>
         }
       />
 
+      {/* --- Sélecteur de mois avec navigation --- */}{" "}
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Label>Mois</Label>
+
+              {/* Bouton précédent */}{" "}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  const newMonth = subtractMonth(monthParam);
+                  setMonthParam(newMonth);
+                  updateFilters("month", newMonth);
+                }}
+                disabled={monthParam === undefined}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>{" "}
+
+              {/* Sélecteur de mois */}{" "}
               <Input
                 type="month"
-                value={monthParam}
+                value={monthParam || ""}
                 className="w-40"
-                onChange={(e) => updateFilters("month", e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (/^\d{4}-\d{2}$/.test(val)) {
+                    setMonthParam(val);
+                    updateFilters("month", val);
+                  }
+                }}
               />
+
+              {/* Bouton suivant */}{" "}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  const newMonth = addMonth(monthParam || defaultMonth, 1);
+                  setMonthParam(newMonth);
+                  updateFilters("month", newMonth);
+                }}
+                disabled={monthParam === maxAllowedMonth}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
             </div>
+
             <div className="flex items-center gap-2">
               <Label>Statut</Label>
               <Select
@@ -203,109 +330,160 @@ export default function PaymentsPage() {
               </Select>
             </div>
           </div>
-          <ExportExcelButton
-            data={payments.map((p) => ({
-              Eleve: p.studentName,
-              Groupe: p.groupName,
-              Mois: p.month,
-              MontantDu: p.amountDue,
-              MontantRegle: p.amountPaid,
-              Statut: p.status === "PAID" ? "Payé" : p.status === "PARTIAL" ? "Partiel" : "Impayé",
-              Note: p.note || "",
-            }))}
-            filename="paiements_centre_prime"
-            label="Exporter les paiements"
-          />
+
+          {/* --- Totaux du mois --- */}{" "}
+          <div className="flex items-center gap-6">
+            {payments.length > 0 || monthParam ? (
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Encaissé :</strong>{" "}
+                  {totalPaid.toLocaleString("fr-FR")} DH
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Reste à payer :</strong>{" "}
+                  {totalRemaining.toLocaleString("fr-FR")} DH
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Sélectionnez un mois pour voir les totaux.
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
+      {/* --- Liste des paiements --- */}{" "}
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Élève</TableHead>
-              <TableHead>Groupe</TableHead>
-              <TableHead>Mois</TableHead>
-              <TableHead>Dû</TableHead>
-              <TableHead>Réglé</TableHead>
-              <TableHead>Statut</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
-                  <Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" />
-                </TableCell>
-              </TableRow>
-            ) : payments.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                  Aucun paiement trouvé.
-                </TableCell>
-              </TableRow>
-            ) : (
-              payments.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.studentName}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {p.subjectName} · {p.groupName}
-                    </div>
-                  </TableCell>
-                  <TableCell className="capitalize">
-                    {new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(
-                      new Date(`${p.month}-02`),
-                    )}
-                  </TableCell>
-                  <TableCell>{p.amountDue} DH</TableCell>
-                  <TableCell>{p.amountPaid} DH</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        p.status === "PAID"
-                          ? "default"
-                          : p.status === "PARTIAL"
-                            ? "secondary"
-                            : "destructive"
-                      }
-                    >
-                      {p.status === "PAID" ? "Payé" : p.status === "PARTIAL" ? "Partiel" : "Impayé"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {p.status !== "PAID" && (
+        <CardContent>
+          <div className="w-full overflow-x-auto">
+            <Table className="sticky top-0 w-full">
+              <TableHeader className="bg-white">
+                <TableRow>
+                  <TableHead className="bg-muted/50 text-muted-foreground text-xs font-medium uppercase tracking-wider col-span-1">
+                    Élève
+                  </TableHead>
+                  <TableHead className="bg-muted/50 text-muted-foreground text-xs font-medium uppercase tracking-wider col-span-1">
+                    Groupe
+                  </TableHead>
+                  <TableHead className="bg-muted/50 text-muted-foreground text-xs font-medium uppercase tracking-wider col-span-1">
+                    Mois
+                  </TableHead>
+                  <TableHead className="bg-muted/50 text-muted-foreground text-right text-xs font-medium uppercase tracking-wider col-span-1">
+                    Dû
+                  </TableHead>
+                  <TableHead className="bg-muted/50 text-muted-foreground text-right text-xs font-medium uppercase tracking-wider col-span-1">
+                    Réglé
+                  </TableHead>
+                  <TableHead className="bg-muted/50 text-muted-foreground text-right text-xs font-medium uppercase tracking-wider col-span-1">
+                    Reste
+                  </TableHead>
+                  <TableHead className="bg-muted/50 text-muted-foreground text-right text-xs font-medium uppercase tracking-wider col-span-1">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
+                      <Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" />
+                    </TableCell>
+                  </TableRow>
+                ) : payments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                      <p className="font-medium">
+                        Aucun paiement trouvé pour {monthParam?.split("-")[1] || "ce mois"}.
+                      </p>
+                      {monthParam && (
                         <Button
-                          size="sm"
                           variant="outline"
-                          onClick={() => {
-                            setSelectedPayment(p);
-                            setPayAmount(String(p.amountDue - p.amountPaid));
-                            setPayOpen(true);
-                          }}
+                          size="sm"
+                          onClick={() => setGenOpen(true)}
                         >
-                          Régler
+                          Générer les paiements de ce mois
                         </Button>
                       )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Reçu"
-                        asChild
-                      >
-                        <Link href={`/payments/${p.id}/receipt`} target="_blank">
-                          <Receipt className="size-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  payments.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">
+                        {p.studentFullName}
+                        {p.studentPhone && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {p.studentPhone}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {p.subjectName} · {p.groupName}
+                        </div>
+                      </TableCell>
+                      <TableCell className="capitalize">
+                        {new Intl.DateTimeFormat("fr-FR", {
+                          month: "long",
+                          year: "numeric",
+                        }).format(new Date(`${p.month}-02`))}
+                      </TableCell>
+                      <TableCell className="text-right">{p.amountDue} DH</TableCell>
+                      <TableCell className="text-right">{p.amountPaid} DH</TableCell>
+                      <TableCell className="text-right">
+                        {Number(p.amountDue || 0) - Number(p.amountPaid || 0)} DH
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            p.status === "PAID"
+                              ? "default"
+                              : p.status === "PARTIAL"
+                                ? "secondary"
+                                : "destructive"
+                          }
+                        >
+                          {p.status === "PAID" ? "Payé" : p.status === "PARTIAL" ? "Partiel" : "Impayé"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {p.status !== "PAID" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedPayment(p);
+                                setPayAmount(
+                                  String(p.amountDue - p.amountPaid)
+                                );
+                                setPayOpen(true);
+                              }}
+                            >
+                              Régler
+                            </Button>
+                          )}
+
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            title="Reçu"
+                            asChild
+                          >
+                            <Link href={`/payments/${p.id}/receipt`} target="_blank">
+                              <Receipt className="size-4" />
+                            </Link>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
       </Card>
 
       {/* Dialog Génération */}
@@ -314,12 +492,23 @@ export default function PaymentsPage() {
           <DialogHeader>
             <DialogTitle>Générer les paiements</DialogTitle>
             <DialogDescription>
-              Crée les paiements "Impayé" pour toutes les inscriptions actives du mois.
+              Crée les paiements «&nbsp;Impayé&nbsp;» pour toutes les inscriptions actives du mois.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Label>Mois cible</Label>
-            <Input type="month" value={genMonth} onChange={(e) => setGenMonth(e.target.value)} />
+            <Input
+              type="month"
+              value={genMonth}
+              onChange={(e) => setGenMonth(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              {genMonth > maxAllowedMonth ? (
+                "⚠️ Impossible de générer pour un mois dépassant le courant + 1"
+              ) : (
+                `Mois courant : ${defaultMonth}, suivant : ${maxAllowedMonth}`
+              )}
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setGenOpen(false)}>
@@ -339,7 +528,7 @@ export default function PaymentsPage() {
           <DialogHeader>
             <DialogTitle>Encaisser un paiement</DialogTitle>
             <DialogDescription>
-              Enregistrez le montant reçu en espèces pour {selectedPayment?.studentName}.
+              Enregistrez le montant reçu en espèces pour {selectedPayment?.studentFullName}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

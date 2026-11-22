@@ -2,9 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { Prisma } from "@/generated/prisma/client";
+import type { PaymentStatus } from "@/generated/prisma/enums";
 import { requireAdmin } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
-import { serializePayment, serializeEnrollment, serializeGroup, serializeStudent, serializeLevel, serializeSubject } from "@/lib/serialize";
+import { serializePayment } from "@/lib/serialize";
+
+const PAYMENT_STATUSES = ["UNPAID", "PARTIAL", "PAID"] as const;
+
+function isPaymentStatus(value: string): value is PaymentStatus {
+  return (PAYMENT_STATUSES as readonly string[]).includes(value);
+}
 
 const UNAUTHORIZED_MESSAGE = "Votre session a expiré. Veuillez vous reconnecter.";
 
@@ -13,7 +21,7 @@ export type GeneratePaymentsResult =
   | { ok: false; error: string };
 
 export type PaymentActionResult =
-  | { ok: true; payment: any }
+  | { ok: true }
   | { ok: false; error: string };
 
 /**
@@ -156,7 +164,7 @@ export async function recordPayment(
     }
 
     revalidatePath("/payments");
-    return { ok: true, payment: { ok: true } };
+    return { ok: true };
   } catch (error) {
     console.error("Erreur recordPayment:", error);
     return { ok: false, error: "Erreur serveur." };
@@ -174,9 +182,11 @@ export async function getPayments(filters: {
   groupId?: string;
   subjectId?: string;
 }) {
-  const where: any = {};
+  const where: Prisma.PaymentWhereInput = {};
   if (filters.month) where.month = filters.month;
-  if (filters.status && filters.status !== "ALL") where.status = filters.status;
+  if (filters.status && filters.status !== "ALL" && isPaymentStatus(filters.status)) {
+    where.status = filters.status;
+  }
   if (filters.groupId) where.enrollment = { groupId: filters.groupId };
   if (filters.subjectId) {
     where.enrollment = {

@@ -1,8 +1,7 @@
-import { Plus, Users, Download } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import Link from "next/link";
 import { z } from "zod";
 
-import { ExportExcelButton } from "@/components/ui/export-excel";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,11 +12,11 @@ import { StudentFormDialog } from "./student-dialogs";
 import { StudentsFilters } from "./students-filters";
 import { StudentsTable } from "./students-table";
 import type { StudentRow } from "./types";
+import { ExportButton } from "@/components/ui/export-button";
 
 const PAGE_SIZE = 10;
 
 // Les données sont chargées à chaque requête (pas de prérendu partiel).
-export const instant = false;
 
 const searchParamsSchema = z.object({
   q: z.string().max(100).catch("").default(""),
@@ -42,6 +41,12 @@ export default async function StudentsPage({
     group: firstValue(rawParams.group),
     page: firstValue(rawParams.page),
   });
+
+  const exportParams = new URLSearchParams();
+  if (params.q) exportParams.set("q", params.q);
+  if (params.status !== "all") exportParams.set("status", params.status);
+  const exportQuery = exportParams.toString();
+  const exportUrl = exportQuery ? `/api/students/export?${exportQuery}` : "/api/students/export";
 
   const where: Prisma.StudentWhereInput = {
     ...(params.q
@@ -112,8 +117,6 @@ export default async function StudentsPage({
     ),
   }));
 
-  const hasFilters = params.q !== "" || params.status !== "all" || params.group !== "";
-
   function pageHref(targetPage: number): string {
     const query = new URLSearchParams();
 
@@ -132,16 +135,11 @@ export default async function StudentsPage({
       <PageHeader
         title="Élèves"
         description="Fiches, coordonnées et inscriptions aux groupes."
-        actions={
-          <div className="flex gap-2">
-            <ExportExcelButton
-              data={rows.map((r) => ({
-                Nom: r.fullName,
-                Telephone: r.phone,
-                Statut: r.isActive ? "Actif" : "Inactif",
-                Groupes: r.groupLabels.join(", "),
-              }))}
-              filename="eleves_centre_prime"
+        actions={(
+          <>
+            <ExportButton
+              url={exportUrl}
+              filename="eleves.xlsx"
               label="Exporter"
             />
             <StudentFormDialog
@@ -152,8 +150,8 @@ export default async function StudentsPage({
                 </Button>
               }
             />
-          </div>
-        }
+          </>
+        )}
       />
 
       <StudentsFilters
@@ -176,19 +174,16 @@ export default async function StudentsPage({
             </span>
             <div className="space-y-1">
               <p className="font-medium">
-                {hasFilters ? "Aucun élève ne correspond aux filtres" : "Aucun élève"}
+                {params.q !== "" || params.status !== "all" || params.group !== ""
+                  ? "Aucun élève ne correspond aux filtres"
+                  : "Aucun élève"}
               </p>
               <p className="text-sm text-muted-foreground">
-                {hasFilters
+                {params.q !== "" || params.status !== "all" || params.group !== ""
                   ? "Modifiez la recherche ou réinitialisez les filtres."
                   : "Ajoutez un premier élève pour commencer."}
               </p>
             </div>
-            {hasFilters ? (
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/students">Réinitialiser les filtres</Link>
-              </Button>
-            ) : null}
           </CardContent>
         </Card>
       ) : (
