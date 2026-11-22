@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
+import { serializePayment, serializeEnrollment, serializeGroup, serializeStudent, serializeLevel, serializeSubject } from "@/lib/serialize";
 
 const UNAUTHORIZED_MESSAGE = "Votre session a expiré. Veuillez vous reconnecter.";
 
@@ -17,6 +18,8 @@ export type PaymentActionResult =
 
 /**
  * Génère automatiquement les paiements mensuels pour tous les groupes actifs.
+ * Toutes les valeurs Decimal sont converties en number via serializePayment
+ * avant tout retour vers le client (même si les calculs internes utilisent Number()).
  */
 export async function generateMonthlyPayments(month: string): Promise<GeneratePaymentsResult> {
   if (!(await requireAdmin())) {
@@ -90,6 +93,8 @@ export async function generateMonthlyPayments(month: string): Promise<GeneratePa
 
 /**
  * Enregistre un paiement.
+ * Les champs amountDue, amountPaid sont calculés en nombre avant création MAIS
+ * le résultat renvoyé au client passe par serializePayment.
  */
 export async function recordPayment(
   enrollmentId: string,
@@ -160,6 +165,8 @@ export async function recordPayment(
 
 /**
  * Récupère les paiements filtrés.
+ * Les objets Decimal sont sérialisés via serializePayment avant d'être retournés
+ * au Client Component pour éviter l'erreur "Decimal objects are not supported".
  */
 export async function getPayments(filters: {
   month?: string;
@@ -197,9 +204,12 @@ export async function getPayments(filters: {
       orderBy: [{ month: "desc" }, { enrollment: { student: { fullName: "asc" } } }],
     });
 
-    return { ok: true, payments, total: payments.length };
+    // Sérialiser chaque paiement avant de le renvoyer au Client Component
+    const serializedPayments = payments.map(serializePayment);
+
+    return { ok: true, payments: serializedPayments, total: serializedPayments.length };
   } catch (error) {
     console.error("Erreur getPayments:", error);
-    return { ok: false, error: "Erreur serveur." };
+    return { ok: false, error: "Erreur serveur.", payments: [] };
   }
 }
