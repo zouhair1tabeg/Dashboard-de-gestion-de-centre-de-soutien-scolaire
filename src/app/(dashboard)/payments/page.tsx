@@ -79,7 +79,7 @@ export default function PaymentsPage() {
   const [payNote, setPayNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // --- Gestion du mois ---
+  // --- Gestion du mois (tableau principal) ---
   const defaultMonth = getCurrentMonthYYYYMM();
   let initialMonth = defaultMonth;
   const urlMonth = searchParams.get("month");
@@ -143,6 +143,51 @@ export default function PaymentsPage() {
     };
   }, [monthParam, statusParam]);
 
+  // --- État du dialog "Générer le mois" ---
+  // Le mois par défaut est calculé à l'ouverture du dialog, pas au chargement de la page
+  useEffect(() => {
+    // Lorsque le dialog s'ouvre, on calcule le mois suivant à partir de la date du serveur
+    if (genOpen) {
+      // On utilise la date du navigateur en fuseau Africa/Casablanca (UTC+0, pas de DST)
+      // mais on peut aussi venir du serveur via une API si besoin
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth(); // 0-indexé, janvier=0
+      // Le mois suivant
+      let nextMonth: number;
+      let nextYear: number;
+      if (month === 11) { // décembre
+        nextMonth = 0; // janvier
+        nextYear = year + 1;
+      } else {
+        nextMonth = month + 1; // janvier=0 -> février=1, etc.
+        nextYear = year;
+      }
+      const formatted = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}`;
+      setGenMonth(formatted);
+    }
+  }, [genOpen]);
+
+  // Compteur de paiements existants pour un mois donné (côté client, fetch serveur)
+  const [paymentCount, setPaymentCount] = useState(0);
+  const [countLoading, setCountLoading] = useState(false);
+
+  const loadPaymentCount = async (month: string) => {
+    setCountLoading(true);
+    try {
+      const res = await getPayments({ month, status: "ALL" });
+      if (res.ok && res.payments) {
+        setPaymentCount(res.payments.length);
+      } else {
+        setPaymentCount(0);
+      }
+    } catch (e) {
+      setPaymentCount(0);
+    } finally {
+      setCountLoading(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!genMonth) return;
     if (genMonth > maxAllowedMonth) {
@@ -154,8 +199,10 @@ export default function PaymentsPage() {
     const res = await generateMonthlyPayments(genMonth);
     setSubmitting(false);
     if (res.ok) {
-      toast.success(`${res.created} paiements générés.`);
+      toast.success(`${res.created} paiements générés, ${res.skipped} déjà existants.`);
       setGenOpen(false);
+      // Reset the month to next month for next time
+      setGenMonth("");
       fetchPayments();
     } else {
       toast.error(res.error);
@@ -169,14 +216,8 @@ export default function PaymentsPage() {
     }
     setSubmitting(true);
     try {
-      const params = new URLSearchParams(searchParams.toString());
-      if (statusParam && statusParam !== "ALL") {
-        params.set("status", statusParam);
-      } else {
-        params.delete("status");
-      }
       const res = await fetch(
-        `/api/payments/export?month=${monthParam}&${params.toString()}`,
+        `/api/payments/export?month=${monthParam}`,
         {
           method: "GET",
           headers: {
@@ -190,7 +231,6 @@ export default function PaymentsPage() {
         toast.error(err.error || "Erreur lors de l'export");
         return;
       }
-      // Créer un lien de téléchargement
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -236,6 +276,16 @@ export default function PaymentsPage() {
   };
 
   // Format "Mois Français" pour l'affichage
+  const formatMonthFR = (monthStr: string | undefined) => {
+    if (!monthStr) return "";
+    const [year, month] = monthStr.split("-");
+    const monthNames = [
+      "Janvier", "Février", "Mars", "Mars", "Mai", "Juin",
+      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+    ];
+    const m = parseInt(month, 10);
+    return `${monthNames[m - 1]} ${year}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -262,14 +312,14 @@ export default function PaymentsPage() {
         }
       />
 
-      {/* --- Sélecteur de mois avec navigation --- */}{" "}
+      {/* --- Sélecteur de mois avec navigation --- */}
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Label>Mois</Label>
 
-              {/* Bouton précédent */}{" "}
+              {/* Bouton précédent */}
               <Button
                 variant="outline"
                 size="icon"
@@ -281,9 +331,9 @@ export default function PaymentsPage() {
                 disabled={monthParam === undefined}
               >
                 <ChevronLeft className="size-4" />
-              </Button>{" "}
+              </Button>
 
-              {/* Sélecteur de mois */}{" "}
+              {/* Sélecteur de mois */}
               <Input
                 type="month"
                 value={monthParam || ""}
@@ -297,7 +347,7 @@ export default function PaymentsPage() {
                 }}
               />
 
-              {/* Bouton suivant */}{" "}
+              {/* Bouton suivant */}
               <Button
                 variant="outline"
                 size="icon"
@@ -331,7 +381,7 @@ export default function PaymentsPage() {
             </div>
           </div>
 
-          {/* --- Totaux du mois --- */}{" "}
+          {/* --- Totaux du mois --- */}
           <div className="flex items-center gap-6">
             {payments.length > 0 || monthParam ? (
               <div>
@@ -353,7 +403,7 @@ export default function PaymentsPage() {
         </CardContent>
       </Card>
 
-      {/* --- Liste des paiements --- */}{" "}
+      {/* --- Liste des paiements --- */}
       <Card>
         <CardContent>
           <div className="w-full overflow-x-auto">
@@ -378,7 +428,7 @@ export default function PaymentsPage() {
                   <TableHead className="bg-muted/50 text-muted-foreground text-right text-xs font-medium uppercase tracking-wider col-span-1">
                     Reste
                   </TableHead>
-                  <TableHead className="bg-muted/50 text-muted-foreground text-right text-xs font-medium uppercase tracking-wider col-span-1">
+                  <TableHead className="bg-muted/50 text-muted-foreground text-xs font-medium uppercase tracking-wider col-span-1">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -502,6 +552,17 @@ export default function PaymentsPage() {
               value={genMonth}
               onChange={(e) => setGenMonth(e.target.value)}
             />
+            {/* Compteur de paiements existants + avertissement */}
+            {genMonth && !countLoading && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {paymentCount} paiement{paymentCount !== 1 && "s"} d\u00e9j\u00e0 g\u00e9n\u00e9r\u00e9s pour ce mois{paymentCount > 0 && paymentCount < 15 ? "" : " (tout est rempli)"}
+              </p>
+            )}
+            {paymentCount >= 15 && (
+              <p className="text-xs text-warning mt-2">
+                ⚠️ Ce mois-ci contient d&eacute;j&agrave; {paymentCount} paiements. La g&eacute;n&eacute;ration créera des doublons mais ne les enregistrera pas.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground mt-2">
               {genMonth > maxAllowedMonth ? (
                 "⚠️ Impossible de générer pour un mois dépassant le courant + 1"
