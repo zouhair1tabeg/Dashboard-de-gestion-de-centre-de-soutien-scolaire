@@ -45,11 +45,12 @@ export function formatPercent(value: number): string {
   return `${Math.round(value)} %`;
 }
 
-/** Formate un nombre en "12 800 DH" (format Maroc/français). */
+const dhFormatter = new Intl.NumberFormat("fr-FR", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+/** Formate un montant en dirhams : « 5 090 DH » (espace insécable fine). */
 export function formatDH(amount: number): string {
-  const formatted = amount.toLocaleString("fr-MA", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-  return `${formatted} DH`;
+  return `${dhFormatter.format(amount)} DH`;
 }
