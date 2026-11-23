@@ -44,3 +44,12 @@ export function todayInputValue(): string {
 export function formatPercent(value: number): string {
   return `${Math.round(value)} %`;
 }
+
+/** Formate un nombre en "12 800 DH" (format Maroc/français). */
+export function formatDH(amount: number): string {
+  const formatted = amount.toLocaleString("fr-MA", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  return `${formatted} DH`;
+}

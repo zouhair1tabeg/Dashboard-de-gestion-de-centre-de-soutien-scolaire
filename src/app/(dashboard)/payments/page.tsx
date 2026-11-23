@@ -521,7 +521,11 @@ export default function PaymentsPage() {
                             title="Reçu"
                             asChild
                           >
-                            <Link href={`/payments/${p.id}/receipt`} target="_blank">
+                            <Link
+                              href={`/payments/${p.id}/receipt`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               <Receipt className="size-4" />
                             </Link>
                           </Button>
