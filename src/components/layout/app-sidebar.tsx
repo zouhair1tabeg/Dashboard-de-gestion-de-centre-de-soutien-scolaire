@@ -3,7 +3,6 @@
 import {
   BookOpen,
   CalendarDays,
-  GraduationCap,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -15,11 +14,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
+import Image from "next/image";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+
+const logoSrc = "/logo.png";
+const iconSrc = "/icon.png";
 
 const navigation = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
@@ -30,16 +33,19 @@ const navigation = [
   { href: "/settings", label: "Paramètres", icon: Settings },
 ] as const;
 
-function Brand() {
+function Brand({ isMobile }: { isMobile: boolean }) {
+  const src = isMobile ? iconSrc : logoSrc;
+  const size = isMobile ? 32 : 1024;
+
   return (
-    <Link href="/" className="flex items-center gap-3">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-        <GraduationCap className="size-5" />
-      </span>
-      <span className="flex flex-col leading-tight">
-        <span className="text-sm font-semibold tracking-tight text-foreground">Centre Prime</span>
-        <span className="text-xs text-muted-foreground">Soutien scolaire</span>
-      </span>
+    <Link href="/" className="flex items-center justify-center py-3">
+      <Image
+        src={src}
+        alt="Centre Prime"
+        width={size}
+        height={size}
+        className="h-auto max-h-[72px] w-auto max-w-[170px] object-contain"
+      />
     </Link>
   );
 }
@@ -128,7 +134,7 @@ export function AppSidebar({ email }: { email: string }) {
   return (
     <>
       <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/85 px-4 backdrop-blur lg:hidden">
-        <Brand />
+        <Brand isMobile={mobileOpen} />
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" aria-label="Ouvrir le menu">
@@ -138,7 +144,7 @@ export function AppSidebar({ email }: { email: string }) {
           <SheetContent side="left" className="w-72 p-0">
             <SheetHeader className="border-b px-5 py-4">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
-              <Brand />
+              <Brand isMobile={mobileOpen} />
             </SheetHeader>
             <div className="flex h-[calc(100%-73px)] flex-col justify-between p-4">
               <NavigationLinks onNavigate={() => setMobileOpen(false)} />
@@ -150,7 +156,7 @@ export function AppSidebar({ email }: { email: string }) {
 
       <aside className="hidden w-[272px] shrink-0 border-r bg-sidebar lg:sticky lg:top-0 lg:flex lg:h-svh lg:flex-col">
         <div className="px-5 py-6">
-          <Brand />
+          <Brand isMobile={mobileOpen} />
         </div>
         <div className="flex-1 px-4">
           <p className="px-3 pb-2 text-[0.68rem] font-semibold tracking-wider text-muted-foreground uppercase">

@@ -17,12 +17,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: "Centre Prime — Gestion du centre",
-    template: "%s · Centre Prime",
-  },
+  title: "Prime New Generation — Gestion du centre",
   description:
     "Application de gestion du centre de soutien scolaire : élèves, groupes, séances et paiements.",
+  icons: {
+    // favicon est défini via lien direct dans la page HTML
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

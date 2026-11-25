@@ -1,4 +1,5 @@
-import { Check, GraduationCap } from "lucide-react";
+import { Check } from "lucide-react";
+import Image from "next/image";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
@@ -35,12 +36,14 @@ export default async function LoginPage() {
         <div className="absolute right-0 -bottom-40 size-[28rem] rounded-full bg-white/5 blur-3xl" />
 
         <div className="relative flex items-center gap-3">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-white/10 backdrop-blur">
-            <GraduationCap className="size-6" />
-          </span>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold tracking-tight">Centre Prime</p>
-            <p className="text-xs text-white/60">Soutien scolaire</p>
+          <div className="rounded-xl bg-white p-3">
+            <Image
+              src="/logo.png"
+              alt="Centre Prime"
+              width={1024}
+              height={1024}
+              className="h-auto max-h-[56px] w-auto object-contain"
+            />
           </div>
         </div>
 
@@ -60,19 +63,19 @@ export default async function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative text-xs text-white/40">Centre Prime · Gestion du centre</p>
+        <p className="relative text-xs text-white/40">Prime New Generation · Gestion du centre</p>
       </section>
 
       <section className="flex items-center justify-center px-5 py-12 sm:px-8">
         <div className="w-full max-w-sm space-y-8">
-          <div className="flex items-center gap-3 lg:hidden">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <GraduationCap className="size-5" />
-            </span>
-            <div className="leading-tight">
-              <p className="text-sm font-semibold tracking-tight">Centre Prime</p>
-              <p className="text-xs text-muted-foreground">Soutien scolaire</p>
-            </div>
+          <div className="flex justify-center">
+            <Image
+              src="/logo.png"
+              alt="Centre Prime"
+              width={1024}
+              height={1024}
+              className="h-auto max-h-[90px] w-auto object-contain mb-6"
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -85,7 +88,7 @@ export default async function LoginPage() {
           <LoginForm />
 
           <p className="text-center text-xs text-muted-foreground/70">
-            © {new Date().getFullYear()} Centre Prime
+            © {new Date().getFullYear()} Prime New Generation
           </p>
         </div>
       </section>

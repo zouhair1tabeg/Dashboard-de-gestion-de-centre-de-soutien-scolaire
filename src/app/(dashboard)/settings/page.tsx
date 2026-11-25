@@ -17,13 +17,14 @@ export default function SettingsPage() {
     event.preventDefault();
     setMessage(null);
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
 
     startTransition(async () => {
       const res = await updateAdminPassword(formData);
       if (res.ok) {
         setMessage({ type: "success", text: "Mot de passe mis à jour avec succès." });
-        event.currentTarget.reset();
+        form.reset();
       } else {
         setMessage({ type: "error", text: res.error });
       }

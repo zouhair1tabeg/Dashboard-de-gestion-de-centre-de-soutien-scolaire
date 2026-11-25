@@ -1,4 +1,7 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
+
+const logoSrc = "/logo.png";
 
 import { formatCurrency } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -75,13 +78,20 @@ export default async function ReceiptPage({
 
       <article className="receipt-sheet mt-6 rounded-xl border border-neutral-300 bg-white p-6 sm:p-10">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-neutral-300 pb-5">
-          <div>
-            <h1 className="text-xl font-bold uppercase tracking-tight">
-              Centre de Soutien Scolaire
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Reçu de paiement en espèces
-            </p>
+          <div className="flex items-center gap-3">
+            <Image
+              src={logoSrc}
+              alt="Centre Prime"
+              width={1024}
+              height={1024}
+              className="h-auto max-h-[56px] w-auto object-contain [print-color-adjust:exact]"
+            />
+            <div>
+              <p className="text-sm font-medium tracking-tight">Centre Prime</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Reçu de paiement en espèces
+              </p>
+            </div>
           </div>
           <div className="text-right">
             <p className="text-sm font-semibold">Date : {formattedDate}</p>

@@ -143,49 +143,22 @@ export default function PaymentsPage() {
     };
   }, [monthParam, statusParam]);
 
-  // --- État du dialog "Générer le mois" ---
-  // Le mois par défaut est calculé à l'ouverture du dialog, pas au chargement de la page
-  useEffect(() => {
-    // Lorsque le dialog s'ouvre, on calcule le mois suivant à partir de la date du serveur
-    if (genOpen) {
-      // On utilise la date du navigateur en fuseau Africa/Casablanca (UTC+0, pas de DST)
-      // mais on peut aussi venir du serveur via une API si besoin
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth(); // 0-indexé, janvier=0
-      // Le mois suivant
-      let nextMonth: number;
-      let nextYear: number;
-      if (month === 11) { // décembre
-        nextMonth = 0; // janvier
-        nextYear = year + 1;
-      } else {
-        nextMonth = month + 1; // janvier=0 -> février=1, etc.
-        nextYear = year;
-      }
-      const formatted = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}`;
-      setGenMonth(formatted);
+  const handleOpenGenModal = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    let nextMonth: number;
+    let nextYear: number;
+    if (month === 11) {
+      nextMonth = 0;
+      nextYear = year + 1;
+    } else {
+      nextMonth = month + 1;
+      nextYear = year;
     }
-  }, [genOpen]);
-
-  // Compteur de paiements existants pour un mois donné (côté client, fetch serveur)
-  const [paymentCount, setPaymentCount] = useState(0);
-  const [countLoading, setCountLoading] = useState(false);
-
-  const loadPaymentCount = async (month: string) => {
-    setCountLoading(true);
-    try {
-      const res = await getPayments({ month, status: "ALL" });
-      if (res.ok && res.payments) {
-        setPaymentCount(res.payments.length);
-      } else {
-        setPaymentCount(0);
-      }
-    } catch (e) {
-      setPaymentCount(0);
-    } finally {
-      setCountLoading(false);
-    }
+    const formatted = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}`;
+    setGenMonth(formatted);
+    setGenOpen(true);
   };
 
   const handleGenerate = async () => {
@@ -275,18 +248,6 @@ export default function PaymentsPage() {
     router.push(`/payments?${params.toString()}`);
   };
 
-  // Format "Mois Français" pour l'affichage
-  const formatMonthFR = (monthStr: string | undefined) => {
-    if (!monthStr) return "";
-    const [year, month] = monthStr.split("-");
-    const monthNames = [
-      "Janvier", "Février", "Mars", "Mars", "Mai", "Juin",
-      "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
-    ];
-    const m = parseInt(month, 10);
-    return `${monthNames[m - 1]} ${year}`;
-  };
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -294,7 +255,7 @@ export default function PaymentsPage() {
         description="Gestion des cotisations mensuelles par élève."
         actions={
           <>
-            <Button onClick={() => setGenOpen(true)} disabled={loading}>
+            <Button onClick={handleOpenGenModal} disabled={loading}>
               <PlusCircle className="mr-2 size-4" />
               Générer le mois
             </Button>
@@ -450,7 +411,7 @@ export default function PaymentsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setGenOpen(true)}
+                          onClick={handleOpenGenModal}
                         >
                           Générer les paiements de ce mois
                         </Button>
@@ -556,17 +517,6 @@ export default function PaymentsPage() {
               value={genMonth}
               onChange={(e) => setGenMonth(e.target.value)}
             />
-            {/* Compteur de paiements existants + avertissement */}
-            {genMonth && !countLoading && (
-              <p className="text-xs text-muted-foreground mt-2">
-                {paymentCount} paiement{paymentCount !== 1 && "s"} d\u00e9j\u00e0 g\u00e9n\u00e9r\u00e9s pour ce mois{paymentCount > 0 && paymentCount < 15 ? "" : " (tout est rempli)"}
-              </p>
-            )}
-            {paymentCount >= 15 && (
-              <p className="text-xs text-warning mt-2">
-                ⚠️ Ce mois-ci contient d&eacute;j&agrave; {paymentCount} paiements. La g&eacute;n&eacute;ration créera des doublons mais ne les enregistrera pas.
-              </p>
-            )}
             <p className="text-xs text-muted-foreground mt-2">
               {genMonth > maxAllowedMonth ? (
                 "⚠️ Impossible de générer pour un mois dépassant le courant + 1"

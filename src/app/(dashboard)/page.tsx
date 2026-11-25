@@ -1,4 +1,5 @@
 import { AlertCircle, BookOpen, Users, Wallet } from "lucide-react";
+import Link from "next/link";
 import { connection } from "next/server";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -313,12 +314,12 @@ export default async function DashboardPage({
       <Card className="gap-4 p-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold">Élèves à surveiller</h2>
-          <a
+          <Link
             href="/students"
             className="rounded-md bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
           >
             Voir tout
-          </a>
+          </Link>
         </div>
         {absentStudents.length > 0 ? (
           <div className="space-y-2">
